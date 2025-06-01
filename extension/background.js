@@ -12,13 +12,20 @@ chrome.contextMenus.create({
 // Handle context menu click
 chrome.contextMenus.onClicked.addListener((info, tab) => {
     if (info.menuItemId === "learnWord" && info.selectionText) {
-        console.log("Selected text:", info.selectionText);
+        let text = info.selectionText;
+        console.log("Selected text:", text);
 
-        chrome.storage.local.set({
-            word: info.selectionText,
-            definition: "test"
-        }, () => {
-            chrome.action.openPopup(); // Note: Chrome 88+ only
-        });
+        fetch("https://localhost:3000/api/v1/spanish/" + encodeURIComponent(text))
+            .then((result) => {
+                console.log(result);
+
+                chrome.storage.local.set({
+                    word: text,
+                    definition: "test"
+                }, () => {
+                    chrome.action.openPopup(); // Note: Chrome 88+ only
+                });
+            });
+
     }
 });
