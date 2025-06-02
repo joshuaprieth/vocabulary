@@ -15,7 +15,7 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
         let text = info.selectionText;
         console.log("Selected text:", text);
 
-        fetch("https://localhost:3000/api/v1/spanish/" + encodeURIComponent(text))
+        fetch("http://localhost:3000/api/v1/spanish/word/" + encodeURIComponent(text))
             .then((result) => {
                 console.log(result);
 

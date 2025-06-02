@@ -3,15 +3,25 @@ use axum::http::StatusCode;
 use axum::response::Json;
 use axum::routing::get;
 use axum::Router;
+use http::Method;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use tokio::net::TcpListener;
+use tower_http::cors::{Any, CorsLayer};
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Define the CORS layer
+    let cors = CorsLayer::new()
+        // Alternatively, use Any to allow all origins (less secure, for dev only)
+        .allow_origin(Any)
+        .allow_methods([Method::GET]);
+
     // Build an axum router
-    let app = Router::new().route("/api/v1/spanish/word/{text}", get(look_up_spanish));
+    let app = Router::new()
+        .route("/api/v1/spanish/word/{text}", get(look_up_spanish))
+        .layer(cors);
 
     // Create a tokio-based TCP listener
     let listener = TcpListener::bind("127.0.0.1:3000").await?;
