@@ -54,12 +54,20 @@ async fn look_up_spanish(Path(text): Path<String>) -> Result<Json<Value>, Status
 
         let definitions = parse_wiktionary(data);
 
-        Ok(Json(json! {
-            {
-                "status": "ok",
-                "definitions": definitions
-            }
-        }))
+        if let Some(definitions) = definitions {
+            Ok(Json(json! {
+                {
+                    "status": "ok",
+                    "definitions": definitions.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+                }
+            }))
+        } else {
+            Ok(Json(json! {
+                {
+                    "status": "not found"
+                }
+            }))
+        }
     } else if status.as_u16() == 404 {
         // Still return a `200` status code here,
         // so that the user can handle this at the
@@ -100,8 +108,8 @@ struct ParsedExample {
     translation: String,
 }
 
-fn parse_wiktionary(mut data: Value) -> Option<Vec<Dictionary>> {
-    let spanish_section = data.get_mut("es")?.take();
-
-    serde_json::from_value(spanish_section).ok()
+fn parse_wiktionary(mut data: Value) -> Option<Result<Vec<Dictionary>, serde_json::Error>> {
+    data.get_mut("es")
+        .map(|i| i.take())
+        .map(|i| serde_json::from_value(i))
 }
