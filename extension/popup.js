@@ -6,7 +6,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const output = document.getElementById('output');
 
         if (result.word && result.definition) {
-            output.textContent = `Word: ${result.word}\nDefinition: ${result.definition}`;
+            output.innerHTML = result["definition"].join("<br>");
             chrome.storage.local.remove(["word", "definition"]);
         } else {
             output.textContent = "No text selected.";

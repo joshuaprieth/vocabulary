@@ -5,7 +5,6 @@ use axum::routing::get;
 use axum::Router;
 use http::Method;
 use reqwest::Client;
-use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use tokio::net::TcpListener;
 use tower_http::cors::{Any, CorsLayer};
@@ -37,7 +36,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 async fn look_up_spanish(Path(text): Path<String>) -> Result<Json<Value>, StatusCode> {
     let response = Client::new()
         .get(format!(
-            "https://en.wiktionary.org/api/rest_v1/page/definition/{}",
+            "https://en.wiktionary.org/api/rest_v1/page/html/{}",
             text
         ))
         .send()
@@ -47,18 +46,18 @@ async fn look_up_spanish(Path(text): Path<String>) -> Result<Json<Value>, Status
     let status = response.status();
 
     if status.is_success() {
-        let data: Value = response
-            .json()
+        let data = response
+            .text()
             .await
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-        let definitions = parse_wiktionary(data);
+        let definitions = parse_wiktionary(&data);
 
         if let Some(definitions) = definitions {
             Ok(Json(json! {
                 {
                     "status": "ok",
-                    "definitions": definitions.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+                    "html": definitions.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
                 }
             }))
         } else {
@@ -82,34 +81,65 @@ async fn look_up_spanish(Path(text): Path<String>) -> Result<Json<Value>, Status
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct Dictionary {
-    part_of_speech: String,
-    definitions: Vec<Definition>,
-}
+const WORD_ROLES: [&'static str; 11] = [
+    "Noun",
+    "Verb",
+    "Adjective",
+    "Adverb",
+    "Pronoun",
+    "Preposition",
+    "Conjunction",
+    "Interjection",
+    "Determiner",
+    "Article",
+    "Participle",
+];
 
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct Definition {
-    definition: String,
-    #[serde(default)]
-    examples: Vec<Example>,
-    #[serde(default)]
-    parsed_examples: Vec<ParsedExample>,
-}
+use scraper::{ElementRef, Html, Selector};
 
-#[derive(Debug, Serialize, Deserialize)]
-struct Example(String);
+fn parse_wiktionary(data: &str) -> Option<Result<Vec<String>, serde_json::Error>> {
+    let mut result = Vec::new();
 
-#[derive(Debug, Serialize, Deserialize)]
-struct ParsedExample {
-    example: String,
-    translation: String,
-}
+    let document = Html::parse_document(data);
 
-fn parse_wiktionary(mut data: Value) -> Option<Result<Vec<Dictionary>, serde_json::Error>> {
-    data.get_mut("es")
-        .map(|i| i.take())
-        .map(|i| serde_json::from_value(i))
+    let body_selector = Selector::parse("body").unwrap();
+    let body = document.select(&body_selector).next().unwrap();
+
+    for sections in body.children() {
+        let mut children = sections.children();
+
+        match children
+            .next()
+            .map(|i| i.value())
+            .and_then(|i| i.as_element())
+            .and_then(|i| i.id())
+        {
+            Some(id) if id == "Spanish" => {}
+            _ => {
+                continue;
+            }
+        };
+
+        for outer_node in children {
+            if let Some(node) = outer_node.children().next() {
+                let inner_text = node.children().next().unwrap().value().as_text();
+
+                if let Some(role) = WORD_ROLES
+                    .iter()
+                    .find(|i| Some(i) == inner_text.map(|i| i as &str).as_ref().as_ref())
+                {
+                    println!("Found subsection {:?}", role);
+
+                    let subsection_html = ElementRef::wrap(outer_node).unwrap().inner_html();
+                    result.push(subsection_html);
+                };
+            };
+        }
+    }
+
+    if result.is_empty() {
+        None
+    } else {
+        Some(Ok(result))
+    }
 }

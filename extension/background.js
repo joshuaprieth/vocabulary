@@ -12,16 +12,17 @@ chrome.contextMenus.create({
 // Handle context menu click
 chrome.contextMenus.onClicked.addListener((info, tab) => {
     if (info.menuItemId === "learnWord" && info.selectionText) {
-        let text = info.selectionText;
+        let text = info.selectionText.trim();
         console.log("Selected text:", text);
 
         fetch("http://localhost:3000/api/v1/spanish/word/" + encodeURIComponent(text))
+            .then((result) => result.json())
             .then((result) => {
                 console.log(result);
 
                 chrome.storage.local.set({
                     word: text,
-                    definition: "test"
+                    definition: result["html"]
                 }, () => {
                     chrome.action.openPopup(); // Note: Chrome 88+ only
                 });
