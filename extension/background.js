@@ -18,14 +18,28 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
         fetch("http://localhost:3000/api/v1/spanish/word/" + encodeURIComponent(text))
             .then((result) => result.json())
             .then((result) => {
-                console.log(result);
-
-                chrome.storage.local.set({
-                    word: text,
-                    definition: result["html"]
-                }, () => {
-                    chrome.action.openPopup(); // Note: Chrome 88+ only
-                });
+                if (result.status === "ok") {
+                    chrome.storage.local.set({
+                        word: text,
+                        definition: result["html"].join("<br>")
+                    }, () => {
+                        chrome.action.openPopup();
+                    });
+                } else if (result.status === "not found") {
+                    chrome.storage.local.set({
+                        word: text,
+                        definition: "Not found in the dictionary."
+                    }, () => {
+                        chrome.action.openPopup();
+                    });
+                } else {
+                    chrome.storage.local.set({
+                        word: text,
+                        definition: "An internal error occurred."
+                    }, () => {
+                        chrome.action.openPopup();
+                    });
+                }
             });
 
     }

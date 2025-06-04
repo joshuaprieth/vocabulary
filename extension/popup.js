@@ -1,13 +1,9 @@
-document.addEventListener('DOMContentLoaded', () => {
-    console.log("Popup loaded");
+document.addEventListener("DOMContentLoaded", () => {
     chrome.storage.local.get(["word", "definition"], (result) => {
-        console.log("Storage data:", result);
-
         const output = document.getElementById('output');
 
         if (result.word && result.definition) {
-            output.innerHTML = result["definition"].join("<br>");
-            chrome.storage.local.remove(["word", "definition"]);
+            output.innerHTML = `<h1>${result.word}</h1>` + result["definition"];
         } else {
             output.textContent = "No text selected.";
         }
