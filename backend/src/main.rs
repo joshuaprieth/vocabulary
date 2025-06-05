@@ -5,6 +5,7 @@ use axum::routing::get;
 use axum::Router;
 use http::Method;
 use reqwest::Client;
+use scraper::{ElementRef, Html, Selector};
 use serde_json::{json, Value};
 use tokio::net::TcpListener;
 use tower_http::cors::{Any, CorsLayer};
@@ -95,9 +96,13 @@ const WORD_ROLES: [&'static str; 11] = [
     "Participle",
 ];
 
-use scraper::{ElementRef, Html, Selector};
-
 fn parse_wiktionary(data: &str) -> Option<Result<Vec<String>, serde_json::Error>> {
+    parse_wiktionary_format1(data).or_else(|| parse_wiktionary_format2(data))
+}
+
+// In the first possible Wiktionary HTML format, the word definitions appear next
+// to an element with the text "Spanish", and have the names in `WORD_ROLES`.
+fn parse_wiktionary_format1(data: &str) -> Option<Result<Vec<String>, serde_json::Error>> {
     let mut result = Vec::new();
 
     let document = Html::parse_document(data);
@@ -128,10 +133,67 @@ fn parse_wiktionary(data: &str) -> Option<Result<Vec<String>, serde_json::Error>
                     .iter()
                     .find(|i| Some(i) == inner_text.map(|i| i as &str).as_ref().as_ref())
                 {
-                    println!("Found subsection {:?}", role);
-
                     let subsection_html = ElementRef::wrap(outer_node).unwrap().inner_html();
                     result.push(subsection_html);
+                };
+            };
+        }
+    }
+
+    if result.is_empty() {
+        None
+    } else {
+        Some(Ok(result))
+    }
+}
+
+// In the second possible Wiktionary HTML format, the word definitions appear
+// in special sections with headers starting with "Etymology", for multiple etymologies.
+fn parse_wiktionary_format2(data: &str) -> Option<Result<Vec<String>, serde_json::Error>> {
+    let mut result = Vec::new();
+
+    let document = Html::parse_document(data);
+
+    let body_selector = Selector::parse("body").unwrap();
+    let body = document.select(&body_selector).next().unwrap();
+
+    for sections in body.children() {
+        let mut children = sections.children();
+
+        match children
+            .next()
+            .map(|i| i.value())
+            .and_then(|i| i.as_element())
+            .and_then(|i| i.id())
+        {
+            Some(id) if id == "Spanish" => {}
+            _ => {
+                continue;
+            }
+        };
+
+        for outer_node in children {
+            let mut children = outer_node.children();
+            if let Some(node) = children.next() {
+                let inner_text = node.children().next().unwrap().value().as_text();
+
+                if let Some(text) = inner_text {
+                    if text.starts_with("Etymology ") {
+                        for outer_node in children {
+                            if let Some(node) = outer_node.children().next() {
+                                if let Some(first_child) = node.children().next() {
+                                    let inner_text = first_child.value().as_text();
+                                    if let Some(role) = WORD_ROLES.iter().find(|i| {
+                                        Some(i) == inner_text.map(|i| i as &str).as_ref().as_ref()
+                                    }) {
+                                        let subsection_html =
+                                            ElementRef::wrap(outer_node).unwrap().inner_html();
+                                        result.push(subsection_html);
+                                    };
+                                };
+                            };
+                        }
+                    };
                 };
             };
         }
