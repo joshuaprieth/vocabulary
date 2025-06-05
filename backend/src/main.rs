@@ -3,10 +3,9 @@ use axum::http::StatusCode;
 use axum::response::Json;
 use axum::routing::get;
 use axum::Router;
-use ego_tree::NodeRef;
 use http::Method;
 use reqwest::Client;
-use scraper::node::{Node, Text};
+use scraper::node::Text;
 use scraper::{ElementRef, Html, Selector};
 use serde_json::{json, Value};
 use tokio::net::TcpListener;
@@ -112,15 +111,10 @@ fn parse_wiktionary_layout1(data: &str) -> Option<Vec<String>> {
     let body_selector = Selector::parse("body").unwrap();
     let body = document.select(&body_selector).next().unwrap();
 
-    for sections in body.children() {
-        let mut children = sections.children();
+    for sections in body.child_elements() {
+        let mut children = sections.child_elements();
 
-        match children
-            .next()
-            .map(|i| i.value())
-            .and_then(|i| i.as_element())
-            .and_then(|i| i.id())
-        {
+        match children.next().map(|i| i.value()).and_then(|i| i.id()) {
             Some(id) if id == "Spanish" => {}
             _ => {
                 continue;
@@ -128,9 +122,9 @@ fn parse_wiktionary_layout1(data: &str) -> Option<Vec<String>> {
         };
 
         for outer_node in children {
-            if let Some(text) = get_first_child_text(outer_node.children().next()) {
+            if let Some(text) = get_first_child_text(outer_node.child_elements().next()) {
                 if WORD_ROLES.iter().any(|i| **i == **text) {
-                    let subsection_html = ElementRef::wrap(outer_node)?.inner_html();
+                    let subsection_html = outer_node.inner_html();
                     result.push(subsection_html);
                 };
             };
@@ -154,15 +148,10 @@ fn parse_wiktionary_layout2(data: &str) -> Option<Vec<String>> {
     let body_selector = Selector::parse("body").unwrap();
     let body = document.select(&body_selector).next().unwrap();
 
-    for sections in body.children() {
-        let mut children = sections.children();
+    for sections in body.child_elements() {
+        let mut children = sections.child_elements();
 
-        match children
-            .next()
-            .map(|i| i.value())
-            .and_then(|i| i.as_element())
-            .and_then(|i| i.id())
-        {
+        match children.next().map(|i| i.value()).and_then(|i| i.id()) {
             Some(id) if id == "Spanish" => {}
             _ => {
                 continue;
@@ -170,14 +159,15 @@ fn parse_wiktionary_layout2(data: &str) -> Option<Vec<String>> {
         };
 
         for outer_node in children {
-            let mut children = outer_node.children();
+            let mut children = outer_node.child_elements();
 
             if let Some(text) = get_first_child_text(children.next()) {
                 if text.starts_with("Etymology ") {
                     for outer_node in children {
-                        if let Some(text) = get_first_child_text(outer_node.children().next()) {
+                        if let Some(text) = get_first_child_text(outer_node.child_elements().next())
+                        {
                             if WORD_ROLES.iter().any(|i| **i == **text) {
-                                let subsection_html = ElementRef::wrap(outer_node)?.inner_html();
+                                let subsection_html = outer_node.inner_html();
 
                                 // Replace the headings by lifting them one level up
                                 // to get a consistent output with the other layout
@@ -203,7 +193,7 @@ fn parse_wiktionary_layout2(data: &str) -> Option<Vec<String>> {
     }
 }
 
-fn get_first_child_text<'a>(node: Option<NodeRef<'a, Node>>) -> Option<&'a Text> {
-    node.and_then(|node| node.children().next())
+fn get_first_child_text<'a>(node: Option<ElementRef<'a>>) -> Option<&'a Text> {
+    node.and_then(|node| node.first_child())
         .and_then(|child| child.value().as_text())
 }
