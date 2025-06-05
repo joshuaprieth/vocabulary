@@ -3,8 +3,10 @@ use axum::http::StatusCode;
 use axum::response::Json;
 use axum::routing::get;
 use axum::Router;
+use ego_tree::NodeRef;
 use http::Method;
 use reqwest::Client;
+use scraper::node::{Node, Text};
 use scraper::{ElementRef, Html, Selector};
 use serde_json::{json, Value};
 use tokio::net::TcpListener;
@@ -58,7 +60,7 @@ async fn look_up_spanish(Path(text): Path<String>) -> Result<Json<Value>, Status
             Ok(Json(json! {
                 {
                     "status": "ok",
-                    "html": definitions.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+                    "html": definitions
                 }
             }))
         } else {
@@ -96,13 +98,13 @@ const WORD_ROLES: [&'static str; 11] = [
     "Participle",
 ];
 
-fn parse_wiktionary(data: &str) -> Option<Result<Vec<String>, serde_json::Error>> {
+fn parse_wiktionary(data: &str) -> Option<Vec<String>> {
     parse_wiktionary_format1(data).or_else(|| parse_wiktionary_format2(data))
 }
 
 // In the first possible Wiktionary HTML format, the word definitions appear next
 // to an element with the text "Spanish", and have the names in `WORD_ROLES`.
-fn parse_wiktionary_format1(data: &str) -> Option<Result<Vec<String>, serde_json::Error>> {
+fn parse_wiktionary_format1(data: &str) -> Option<Vec<String>> {
     let mut result = Vec::new();
 
     let document = Html::parse_document(data);
@@ -126,17 +128,9 @@ fn parse_wiktionary_format1(data: &str) -> Option<Result<Vec<String>, serde_json
         };
 
         for outer_node in children {
-            if let Some(node) = outer_node.children().next() {
-                let inner_text = node
-                    .children()
-                    .next()
-                    .unwrap()
-                    .value()
-                    .as_text()
-                    .map(|i| i as &str);
-
-                if WORD_ROLES.iter().any(|i| Some(i) == inner_text.as_ref()) {
-                    let subsection_html = ElementRef::wrap(outer_node).unwrap().inner_html();
+            if let Some(text) = get_first_child_text(outer_node.children().next()) {
+                if WORD_ROLES.iter().any(|i| **i == **text) {
+                    let subsection_html = ElementRef::wrap(outer_node)?.inner_html();
                     result.push(subsection_html);
                 };
             };
@@ -146,13 +140,13 @@ fn parse_wiktionary_format1(data: &str) -> Option<Result<Vec<String>, serde_json
     if result.is_empty() {
         None
     } else {
-        Some(Ok(result))
+        Some(result)
     }
 }
 
 // In the second possible Wiktionary HTML format, the word definitions appear
 // in special sections with headers starting with "Etymology", for multiple etymologies.
-fn parse_wiktionary_format2(data: &str) -> Option<Result<Vec<String>, serde_json::Error>> {
+fn parse_wiktionary_format2(data: &str) -> Option<Vec<String>> {
     let mut result = Vec::new();
 
     let document = Html::parse_document(data);
@@ -177,25 +171,17 @@ fn parse_wiktionary_format2(data: &str) -> Option<Result<Vec<String>, serde_json
 
         for outer_node in children {
             let mut children = outer_node.children();
-            if let Some(node) = children.next() {
-                let inner_text = node.children().next().unwrap().value().as_text();
 
-                if let Some(text) = inner_text {
-                    if text.starts_with("Etymology ") {
-                        for outer_node in children {
-                            if let Some(node) = outer_node.children().next() {
-                                if let Some(first_child) = node.children().next() {
-                                    let inner_text =
-                                        first_child.value().as_text().map(|i| i as &str);
-                                    if WORD_ROLES.iter().any(|i| Some(i) == inner_text.as_ref()) {
-                                        let subsection_html =
-                                            ElementRef::wrap(outer_node).unwrap().inner_html();
-                                        result.push(subsection_html);
-                                    };
-                                };
+            if let Some(text) = get_first_child_text(children.next()) {
+                if text.starts_with("Etymology ") {
+                    for outer_node in children {
+                        if let Some(text) = get_first_child_text(outer_node.children().next()) {
+                            if WORD_ROLES.iter().any(|i| **i == **text) {
+                                let subsection_html = ElementRef::wrap(outer_node)?.inner_html();
+                                result.push(subsection_html);
                             };
-                        }
-                    };
+                        };
+                    }
                 };
             };
         }
@@ -204,6 +190,11 @@ fn parse_wiktionary_format2(data: &str) -> Option<Result<Vec<String>, serde_json
     if result.is_empty() {
         None
     } else {
-        Some(Ok(result))
+        Some(result)
     }
+}
+
+fn get_first_child_text<'a>(node: Option<NodeRef<'a, Node>>) -> Option<&'a Text> {
+    node.and_then(|node| node.children().next())
+        .and_then(|child| child.value().as_text())
 }
