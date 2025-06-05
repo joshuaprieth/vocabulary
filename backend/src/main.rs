@@ -178,7 +178,16 @@ fn parse_wiktionary_format2(data: &str) -> Option<Vec<String>> {
                         if let Some(text) = get_first_child_text(outer_node.children().next()) {
                             if WORD_ROLES.iter().any(|i| **i == **text) {
                                 let subsection_html = ElementRef::wrap(outer_node)?.inner_html();
-                                result.push(subsection_html);
+
+                                // Replace the headings by lifting them one level up
+                                // to get a consistent output with the other layout
+                                result.push(
+                                    subsection_html
+                                        .replace("\u{003C}h4", "\u{003C}h3")
+                                        .replace("\u{003C}/h4", "\u{003C}/h3")
+                                        .replace("\u{003C}h5", "\u{003C}h4")
+                                        .replace("\u{003C}/h5", "\u{003C}/h4"),
+                                );
                             };
                         };
                     }
