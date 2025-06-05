@@ -99,12 +99,12 @@ const WORD_ROLES: [&'static str; 11] = [
 ];
 
 fn parse_wiktionary(data: &str) -> Option<Vec<String>> {
-    parse_wiktionary_format1(data).or_else(|| parse_wiktionary_format2(data))
+    parse_wiktionary_layout1(data).or_else(|| parse_wiktionary_layout2(data))
 }
 
-// In the first possible Wiktionary HTML format, the word definitions appear next
+// In the first possible Wiktionary HTML layout, the word definitions appear next
 // to an element with the text "Spanish", and have the names in `WORD_ROLES`.
-fn parse_wiktionary_format1(data: &str) -> Option<Vec<String>> {
+fn parse_wiktionary_layout1(data: &str) -> Option<Vec<String>> {
     let mut result = Vec::new();
 
     let document = Html::parse_document(data);
@@ -144,9 +144,9 @@ fn parse_wiktionary_format1(data: &str) -> Option<Vec<String>> {
     }
 }
 
-// In the second possible Wiktionary HTML format, the word definitions appear
+// In the second possible Wiktionary HTML layout, the word definitions appear
 // in special sections with headers starting with "Etymology", for multiple etymologies.
-fn parse_wiktionary_format2(data: &str) -> Option<Vec<String>> {
+fn parse_wiktionary_layout2(data: &str) -> Option<Vec<String>> {
     let mut result = Vec::new();
 
     let document = Html::parse_document(data);
