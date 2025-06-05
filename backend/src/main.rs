@@ -127,12 +127,15 @@ fn parse_wiktionary_format1(data: &str) -> Option<Result<Vec<String>, serde_json
 
         for outer_node in children {
             if let Some(node) = outer_node.children().next() {
-                let inner_text = node.children().next().unwrap().value().as_text();
+                let inner_text = node
+                    .children()
+                    .next()
+                    .unwrap()
+                    .value()
+                    .as_text()
+                    .map(|i| i as &str);
 
-                if let Some(role) = WORD_ROLES
-                    .iter()
-                    .find(|i| Some(i) == inner_text.map(|i| i as &str).as_ref().as_ref())
-                {
+                if WORD_ROLES.iter().any(|i| Some(i) == inner_text.as_ref()) {
                     let subsection_html = ElementRef::wrap(outer_node).unwrap().inner_html();
                     result.push(subsection_html);
                 };
@@ -182,10 +185,9 @@ fn parse_wiktionary_format2(data: &str) -> Option<Result<Vec<String>, serde_json
                         for outer_node in children {
                             if let Some(node) = outer_node.children().next() {
                                 if let Some(first_child) = node.children().next() {
-                                    let inner_text = first_child.value().as_text();
-                                    if let Some(role) = WORD_ROLES.iter().find(|i| {
-                                        Some(i) == inner_text.map(|i| i as &str).as_ref().as_ref()
-                                    }) {
+                                    let inner_text =
+                                        first_child.value().as_text().map(|i| i as &str);
+                                    if WORD_ROLES.iter().any(|i| Some(i) == inner_text.as_ref()) {
                                         let subsection_html =
                                             ElementRef::wrap(outer_node).unwrap().inner_html();
                                         result.push(subsection_html);
