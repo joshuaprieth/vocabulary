@@ -83,8 +83,9 @@ async fn look_up_spanish(Path(text): Path<String>) -> Result<Json<Value>, Status
     }
 }
 
-const WORD_ROLES: [&'static str; 11] = [
+const WORD_ROLES: [&'static str; 12] = [
     "Noun",
+    "Proper noun",
     "Verb",
     "Adjective",
     "Adverb",
