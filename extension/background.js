@@ -19,21 +19,21 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
             .then((result) => result.json())
             .then((result) => {
                 if (result.status === "ok") {
-                    chrome.storage.local.set({
+                    chrome.storage.session.set({
                         word: text,
                         definition: result["html"].join("<br>")
                     }, () => {
                         chrome.action.openPopup();
                     });
                 } else if (result.status === "not found") {
-                    chrome.storage.local.set({
+                    chrome.storage.session.set({
                         word: text,
                         definition: "Not found in the dictionary."
                     }, () => {
                         chrome.action.openPopup();
                     });
                 } else {
-                    chrome.storage.local.set({
+                    chrome.storage.session.set({
                         word: text,
                         definition: "An internal error occurred."
                     }, () => {
@@ -41,6 +41,5 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
                     });
                 }
             });
-
     }
 });

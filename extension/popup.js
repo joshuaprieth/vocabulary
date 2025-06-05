@@ -1,11 +1,15 @@
 document.addEventListener("DOMContentLoaded", () => {
-    chrome.storage.local.get(["word", "definition"], (result) => {
+    chrome.storage.session.get(["word", "definition"], (result) => {
         updateContent(result);
     });
 });
 
 let prefetchLimit = 5;
 function updateContent({ word, definition }) {
+    chrome.storage.session.set({
+        word, definition
+    });
+
     const output = document.getElementById("output");
 
     if (word && definition) {
