@@ -12,7 +12,7 @@ chrome.contextMenus.create({
 // Handle context menu click
 chrome.contextMenus.onClicked.addListener((info, tab) => {
     if (info.menuItemId === "learnWord" && info.selectionText) {
-        let text = info.selectionText.trim();
+        let text = info.selectionText.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑüÜ ]/g, "");
         console.log("Selected text:", text);
 
         fetch("http://localhost:3000/api/v1/spanish/word/" + encodeURIComponent(text))
